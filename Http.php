@@ -44,6 +44,7 @@ class Http
     // 请求Cookies
     protected $cookies = null;
 
+    // 本地Cookie保存路径
     protected $cookie_path;
 
     /**
@@ -109,10 +110,8 @@ class Http
     {
         $header = null;
         $response = null;
-        $QueryStr = null;
-        if (!empty($params)) {
-            $this->method = 'POST';
-        }
+        $queryStr = null;
+        $params && $this->method = 'POST';
         if (function_exists('curl_exec')) {
             $ch = curl_init($this->url);
             curl_setopt_array(
@@ -135,34 +134,39 @@ class Http
                 curl_setopt($ch, CURLOPT_HTTPGET, true);
             } else {
                 if (is_array($params)) {
-                    $QueryStr = http_build_query($params);
+                    $queryStr = http_build_query($params);
                 } else {
-                    $QueryStr = $params;
+                    $queryStr = $params;
                 }
                 curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $QueryStr);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $queryStr);
             }
             $fp = curl_exec($ch);
             curl_close($ch);
+
             if (!$fp) {
                 return false;
             }
+
+            // 读取 header
             $i = 0;
             $length = strlen($fp);
-            // 读取 header
             do {
                 $header .= substr($fp, $i, 1);
                 $i++;
             } while (!preg_match("/\r\n\r\n$/", $header));
+
             // 遇到跳转，执行跟踪跳转
             if ($this->redirect($header)) {
                 return true;
             }
+
             // 读取内容
             do {
                 $response .= substr($fp, $i, 4096);
                 $i = $i + 4096;
             } while ($length >= $i);
+
             unset($fp, $length, $i);
         }
 
@@ -181,8 +185,11 @@ class Http
     {
         if (in_array($this->status($header), array(301, 302))) {
             if (preg_match("/Location\:(.+)\r\n/i", $header, $regs)) {
-                $this->connect(trim($regs[1]), $this->method, $this->timeout);
-                $this->send();
+                $regs[1] = trim($regs[1]);
+                $url = parse_url($regs[1]);
+                !isset($url['host']) && $regs[1] = $this->referer . $regs[1];
+                $this->getCookies()->connect($regs[1], $this->method, $this->timeout)->send();
+//                $this->connect($regs[1], $this->method, $this->timeout)->send();
                 return true;
             }
         }
@@ -272,6 +279,10 @@ class Http
      */
     public function getCookies()
     {
+        if (file_exists($this->cookie_path)) {
+            unlink($this->cookie_path);
+        }
+
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->url);
         curl_setopt($ch, CURLOPT_HEADER, 0);
@@ -279,6 +290,7 @@ class Http
         curl_setopt($ch, CURLOPT_COOKIEJAR, $this->cookie_path);
         curl_exec($ch);
         curl_close($ch);
+
         return $this;
     }
 

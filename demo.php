@@ -15,17 +15,19 @@ if ('POST' == $_SERVER['REQUEST_METHOD']) {
         return false;
     }
 
-    $http = new Http($url);
+    try {
+        $http = new Http($url);
+        if (empty($cookies)) {
+            $http->getCookies()->send();
+        } else {
+            $http->setCookies($cookies)->send();
+        }
+        $body = $http->response();
 
-    if (empty($cookies)) {
-        $http->getCookies()->send();
-    } else {
-        $http->setCookies($cookies)->send();
+        echo $body;
+    } catch (\Exception $e) {
+        echo $e->getError();
     }
-
-    $body = $http->response();
-
-    echo $body;
 } else {
     header('HTTP/1.1 400 Bad Request');
 }
