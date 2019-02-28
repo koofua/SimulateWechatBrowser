@@ -44,13 +44,16 @@ class Http
     // 请求Cookies
     protected $cookies = null;
 
+    protected $cookie_path;
+
     /**
      * 兼容PHP5模式
      *
      * Http constructor.
-     * @param null $url
+     *
+     * @param null   $url
      * @param string $method
-     * @param int $timeout
+     * @param int    $timeout
      */
     public function __construct($url = null, $method = 'GET', $timeout = 60)
     {
@@ -58,15 +61,16 @@ class Http
         if (!empty($url)) {
             $this->connect($url, $method, $timeout);
         }
+        $this->cookie_path = dirname(__FILE__) . "/pic.cookie";
         return $this;
     }
 
     /**
      * 初始化对象
      *
-     * @param string $url
-     * @param string $method
-     * @param int $timeout
+     * @param  string $url
+     * @param  string $method
+     * @param  int    $timeout
      * @return object
      */
     public function Httplib($url = null, $method = 'GET', $timeout = 60)
@@ -77,9 +81,9 @@ class Http
     /**
      * 改变连接url
      *
-     * @param string $url
-     * @param string $method
-     * @param int $timeout
+     * @param  string $url
+     * @param  string $method
+     * @param  int    $timeout
      * @return object
      */
     public function connect($url = null, $method = 'GET', $timeout = 60)
@@ -98,7 +102,7 @@ class Http
     /**
      * 发送请求
      *
-     * @param array $params
+     * @param  array $params
      * @return bool
      */
     public function send($params = array())
@@ -106,19 +110,27 @@ class Http
         $header = null;
         $response = null;
         $QueryStr = null;
-        if (!empty($params)) {$this->method = 'POST';}
+        if (!empty($params)) {
+            $this->method = 'POST';
+        }
         if (function_exists('curl_exec')) {
             $ch = curl_init($this->url);
-            curl_setopt_array($ch, array(
-                CURLOPT_TIMEOUT => $this->timeout,
-                CURLOPT_HEADER => true,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_USERAGENT => $this->user_agent,
-                CURLOPT_REFERER => $this->referer,
-            ));
+            curl_setopt_array(
+                $ch, array(
+                    CURLOPT_TIMEOUT => $this->timeout,
+                    CURLOPT_HEADER => true,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_USERAGENT => $this->user_agent,
+                    CURLOPT_REFERER => $this->referer,
+                )
+            );
+
             if (!is_null($this->cookies)) {
                 curl_setopt($ch, CURLOPT_COOKIE, $this->cookies);
+            } else {
+                curl_setopt($ch, CURLOPT_COOKIEFILE, $this->cookie_path);
             }
+
             if ($this->method == 'GET') {
                 curl_setopt($ch, CURLOPT_HTTPGET, true);
             } else {
@@ -132,15 +144,20 @@ class Http
             }
             $fp = curl_exec($ch);
             curl_close($ch);
-            if (!$fp) {return false;}
+            if (!$fp) {
+                return false;
+            }
             $i = 0;
             $length = strlen($fp);
             // 读取 header
             do {
                 $header .= substr($fp, $i, 1);
-                $i++;} while (!preg_match("/\r\n\r\n$/", $header));
+                $i++;
+            } while (!preg_match("/\r\n\r\n$/", $header));
             // 遇到跳转，执行跟踪跳转
-            if ($this->redirect($header)) {return true;}
+            if ($this->redirect($header)) {
+                return true;
+            }
             // 读取内容
             do {
                 $response .= substr($fp, $i, 4096);
@@ -157,7 +174,7 @@ class Http
     /**
      * 跟踪跳转
      *
-     * @param string $header
+     * @param  string $header
      * @return bool
      */
     public function redirect($header)
@@ -185,7 +202,7 @@ class Http
     /**
      * 处理返回响应内容
      *
-     * @param $response
+     * @param  $response
      * @return mixed
      */
     public function handleResponse($response)
@@ -215,7 +232,7 @@ class Http
     /**
      * 返回状态
      *
-     * @param string $header
+     * @param  string $header
      * @return int
      */
     public function status($header = null)
@@ -249,9 +266,26 @@ class Http
     }
 
     /**
+     * 获取Cookies
+     *
+     * @return $this
+     */
+    public function getCookies()
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->url);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_COOKIEJAR, $this->cookie_path);
+        curl_exec($ch);
+        curl_close($ch);
+        return $this;
+    }
+
+    /**
      * 设置Cookies
      *
-     * @param $cookies
+     * @param  $cookies
      * @return $this
      */
     public function setCookies($cookies)
